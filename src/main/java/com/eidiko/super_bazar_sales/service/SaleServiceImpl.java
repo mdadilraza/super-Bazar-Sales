@@ -26,45 +26,24 @@ public class SaleServiceImpl implements SaleService {
 
     @Override
     public List<SalesReports> getAllSalesByStoreId(int id) {
-        List<Sale> sales = saleRepository.findByStoreId(id);
-        List<Product> products = productRepository.findAll();
+         return productRepository.findAll().stream()
+                .map(product -> {
+                    int productSaleCount = saleRepository.findAll().stream()
+                            .filter(sale -> sale.getStore().getId() == storeId)
+                            .filter(prod -> prod.getProduct().getId() == product.getId())
+                            .mapToInt(Sale::getSaleQuantity)
+                            .sum();
 
-        // Initialize the report list with all products and set initial sales to 0
-        List<SalesReports> bazarSales = products.stream()
-                .map(prod -> new SalesReports(prod.getName(),
-                        0,
-                        prod.getMrp(),
-                        0.0))
-                .toList();
-        log.info("bazarSales: {}", bazarSales);
+                    log.info("productSaleCount {}", productSaleCount);
 
-        // Group sales by product name
-        Map<String, List<Sale>> groupedSales = sales.stream()
-                .collect(Collectors.groupingBy(sale -> sale.getProduct().getName()));
-
-        log.info("groupedSales: {}", groupedSales);
-
-        // Update the report list with actual sales data
-        groupedSales.forEach((productName, productSales) -> {
-            // Calculate total quantity and amount for the product
-            int totalQuantity = productSales.stream().
-                    mapToInt(Sale::getSale_quantity).sum();
-            double mrp = productSales.get(0).
-                    getProduct().
-                    getMrp();
-            double totalAmount = totalQuantity * mrp;
-
-            // Find the product in the report list and update the sale and amount
-            bazarSales.stream()
-                    .filter(report -> report.getProductName().equals(productName))
-                    .findFirst()
-                    .ifPresent(report -> {
-                        report.setSale(totalQuantity);
-                        report.setAmount(totalAmount);
-                    });
-        });
-
-        return bazarSales;
+                    return SalesReports
+                            .builder()
+                            .productName(product.getName())
+                            .saleQuantity(productSaleCount)
+                            .mrp(product.getMrp())
+                            .totalAmount(productSaleCount * product.getMrp())
+                            .build();
+                }).toList();
     }
 
 
